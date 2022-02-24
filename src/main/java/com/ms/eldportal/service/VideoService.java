@@ -182,6 +182,7 @@ public class VideoService {
                 VideoDetailVo videoDetailVo=new VideoDetailVo();
                 if(userProfile!=null){
                     Long countLike=userLikeRepository.countUserLikeByVideoDetailAndUser(videoDetail,userProfile);
+                    videoDetailVo.setCurrentUser(userProfile.getUserName());
                     if(countLike>0){
                         videoDetailVo.setLike(true);
                     }else{
@@ -196,7 +197,6 @@ public class VideoService {
                 videoDetailVo.setFileName(baseUrl+"/video/"+videoDetail.getFileName());
                 videoDetailVo.setAuthor(videoDetail.getAuthor());
                 videoDetailVo.setDescription(videoDetail.getDescription());
-                videoDetailVo.setCurrentUser(userProfile.getUserName());
                 videoDetailVo.setRating(videoDetail.getRating());
                 videoDetailVo.setTotalNoOfLikes(videoDetail.getTotalNoOfLikes());
                 videoDetailVo.setId(videoDetail.getId());

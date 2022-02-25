@@ -26,12 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
 
+import javax.transaction.Transactional;
 import java.io.IOException;
 import java.sql.Date;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -63,7 +61,7 @@ public class VideoService {
         return Mono.fromSupplier(() -> resourceLoader.getResource("azure-blob://eldlmsstoragecontainer/"+title));
     }
 
-    public void upload(MultipartFile file, String name, String description, String type) {
+    public void upload(MultipartFile file, String name, String description, String type, String category) {
         BlobClient blobClient = blobServiceClient.getBlobContainerClient("eldlmsstoragecontainer").getBlobClient(file.getOriginalFilename());
 
         try {
@@ -72,9 +70,11 @@ public class VideoService {
             e.printStackTrace();
         }
         VideoDetail videoDetail=new VideoDetail();
+        videoDetail.setRating(Long.valueOf(0));
+        videoDetail.setTotalNoOfLikes(Long.valueOf(0));
         videoDetail.setDescription(description);
         videoDetail.setAuthor("Rohit Roy");
-        videoDetail.setCategory("Traditional Investment Products");
+        videoDetail.setCategory(category);
         videoDetail.setUploadedBy("admin");
         videoDetail.setFileName(file.getOriginalFilename());
         videoDetail.setCreationTime(new Date(System.currentTimeMillis()));
@@ -83,18 +83,29 @@ public class VideoService {
         videoDetailRepository.save(videoDetail);
     }
 
+    @Transactional
     public void like(UserLikeRequest userLikeRequest) {
         UserProfile userProfile=userRepository.findByUserName(userLikeRequest.getUserId());
         Optional<VideoDetail> videoDetailOptional=videoDetailRepository.findById(userLikeRequest.getVideoId());
+
         if(videoDetailOptional.isPresent()
                 && userProfile!=null){
             VideoDetail videoDetail=videoDetailOptional.get();
-            UserLike userLike=new UserLike();
-            userLike.setUser(userProfile);
-            userLike.setVideoDetail(videoDetailOptional.get());
-            userLikeRepository.save(userLike);
-            videoDetail.setTotalNoOfLikes(videoDetail.getTotalNoOfLikes()+1);
-            videoDetailRepository.save(videoDetail);
+            if(!userLikeRequest.getLike()){
+                Long countUserLike=userLikeRepository.countUserLikeByVideoDetailAndUser(videoDetail,userProfile);
+                if(countUserLike>0){
+                    userLikeRepository.deleteByVideoDetailAndUser(videoDetail,userProfile);
+                    videoDetail.setTotalNoOfLikes(videoDetail.getTotalNoOfLikes()-1);
+                    videoDetailRepository.save(videoDetail);
+                }
+            }else {
+                UserLike userLike = new UserLike();
+                userLike.setUser(userProfile);
+                userLike.setVideoDetail(videoDetailOptional.get());
+                userLikeRepository.save(userLike);
+                videoDetail.setTotalNoOfLikes(videoDetail.getTotalNoOfLikes() + 1);
+                videoDetailRepository.save(videoDetail);
+            }
         }
     }
 
@@ -104,14 +115,23 @@ public class VideoService {
         if(videoDetailOptional.isPresent()
                 && userProfile!=null){
             VideoDetail videoDetail=videoDetailOptional.get();
+
+            Rating existingRating=ratingRepository.findByVideoDetailAndUser(videoDetail,userProfile);
             Long countRating=ratingRepository.countRatingByVideoDetail(videoDetail);
-            Long newAverageRating=((videoDetail.getRating()*countRating)+ratingRequest.getRating())/(countRating+1);
-            videoDetail.setRating(newAverageRating);
-            Rating rating=new Rating();
-            rating.setUser(userProfile);
-            rating.setVideoDetail(videoDetail);
-            rating.setRating(ratingRequest.getRating());
-            ratingRepository.save(rating);
+            if(existingRating!=null){
+                Long newAverageRating=((videoDetail.getRating()*countRating)+ratingRequest.getRating()-existingRating.getRating())/(countRating);
+                videoDetail.setRating(newAverageRating);
+                existingRating.setRating(ratingRequest.getRating());
+                ratingRepository.save(existingRating);
+            }else{
+                Long newAverageRating=((videoDetail.getRating()*countRating)+ratingRequest.getRating())/(countRating+1);
+                videoDetail.setRating(newAverageRating);
+                Rating rating=new Rating();
+                rating.setUser(userProfile);
+                rating.setVideoDetail(videoDetail);
+                rating.setRating(ratingRequest.getRating());
+                ratingRepository.save(rating);
+            }
             videoDetailRepository.save(videoDetail);
         }
 
@@ -120,7 +140,7 @@ public class VideoService {
     public LoginResponse login(LoginRequest loginRequest, String baseUrl) {
         UserProfile userProfile=userRepository.findByUserNameAndPassword(loginRequest.getUsername(),loginRequest.getPassword());
         if(userProfile!=null){
-            List<VideoDetail> videoDetails=videoDetailRepository.findTop3ByCategoryOrderByRating(userProfile.getCategory());
+            List<VideoDetail> videoDetails=videoDetailRepository.findTop3ByCategoryOrderByRatingDesc(userProfile.getCategory());
             LoginResponse loginResponse=new LoginResponse();
             loginResponse.setPassword(userProfile.getPassword());
             loginResponse.setUserId(userProfile.getUserName());
@@ -165,7 +185,7 @@ public class VideoService {
         if("All".equalsIgnoreCase(categoryRequest.getCategory())){
             videoDetails=videoDetailRepository.findAll();
         }else{
-            videoDetails = videoDetailRepository.findByCategoryOrderByRating(categoryRequest.getCategory());
+            videoDetails = videoDetailRepository.findByCategoryOrderByRatingDesc(categoryRequest.getCategory());
         }
         LoginResponse loginResponse=new LoginResponse();
         loginResponse.setUserId(categoryRequest.getUserId());
@@ -203,6 +223,7 @@ public class VideoService {
                 videoDetailVo.setCreationTime(videoDetail.getCreationTime());
                 videoDetailVoList.add(videoDetailVo);
             });
+            Collections.sort(categoryVo.getVideoList());
         });
         return loginResponse;
 

@@ -6,4 +6,5 @@ import lombok.Data;
 public class UserLikeRequest {
     private String userId;
     private Long videoId;
+    private Boolean like;
 }

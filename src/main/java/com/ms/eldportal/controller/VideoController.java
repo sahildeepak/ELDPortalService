@@ -52,8 +52,8 @@ public class VideoController {
     }
 
     @PostMapping(value = "video/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public void upload(@RequestParam("file") MultipartFile file,@RequestParam("name") String name,@RequestParam("description") String description,@RequestParam("type") String type) {
-        service.upload(file,name,description,type);
+    public void upload(@RequestParam("file") MultipartFile file,@RequestParam("name") String name,@RequestParam("description") String description,@RequestParam("type") String type,@RequestParam("category") String category) {
+        service.upload(file,name,description,type,category);
     }
 
     @PostMapping(value = "video/like", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -76,7 +76,7 @@ public class VideoController {
     }
 
     @PostMapping(value = "video/category", consumes = MediaType.APPLICATION_JSON_VALUE , produces = MediaType.APPLICATION_JSON_VALUE)
-    public LoginResponse login(@RequestBody CategoryRequest categoryRequest, HttpServletRequest httpServletRequest) {
+    public LoginResponse category(@RequestBody CategoryRequest categoryRequest, HttpServletRequest httpServletRequest) {
         String baseUrl= ServletUriComponentsBuilder.fromRequestUri(httpServletRequest)
                 .replacePath(null)
                 .build()

@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface VideoDetailRepository extends JpaRepository<VideoDetail, Long> {
 
-    List<VideoDetail> findTop3ByCategoryOrderByRating(String category);
+    List<VideoDetail> findTop3ByCategoryOrderByRatingDesc(String category);
 
-    List<VideoDetail> findByCategoryOrderByRating(String category);
+    List<VideoDetail> findByCategoryOrderByRatingDesc(String category);
 }
